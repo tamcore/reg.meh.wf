@@ -15,7 +15,7 @@ const (
 	initializedKey = "ephemeron:initialized"
 )
 
-// Client wraps the Redis client with ttl.sh-compatible operations.
+// Client wraps the Redis client with ephemeron-specific operations.
 type Client struct {
 	rdb *redis.Client
 }
@@ -40,7 +40,6 @@ func (c *Client) Close() error {
 }
 
 // TrackImage adds an image to the tracking set and stores its expiry metadata.
-// This is compatible with the upstream ttl.sh Redis schema.
 func (c *Client) TrackImage(ctx context.Context, imageWithTag string, expiresAt time.Time) error {
 	pipe := c.rdb.Pipeline()
 	pipe.SAdd(ctx, imagesKey, imageWithTag)

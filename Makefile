@@ -1,5 +1,5 @@
 IMG ?= ephemeron
-IMG_REGISTRY ?= ttl.sh
+IMG_REGISTRY ?= ghcr.io/tamcore
 IMG_TAG ?= dev
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
