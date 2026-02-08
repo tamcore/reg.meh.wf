@@ -1,0 +1,15 @@
+{{- if and .Values.registry.metrics.enabled .Values.registry.metrics.serviceMonitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-registry-metrics
+  labels:
+    app: {{ .Release.Name }}-registry
+spec:
+  selector:
+    app: {{ .Release.Name }}-registry
+  ports:
+    - port: 5001
+      targetPort: metrics
+      name: metrics
+{{- end }}
