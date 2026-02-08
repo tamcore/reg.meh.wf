@@ -2,12 +2,12 @@ name: ephemeron
 
 services:
   registry:
-    image: registry:3
+    image: registry:3.0.0
     ports:
       - "5000:5000"
     volumes:
       - registry-data:/var/lib/registry
-      - ./deploy/docker-compose/registry-config.yml:/etc/docker/registry/config.yml:ro
+      - ./deploy/docker-compose/registry-config.yml:/etc/distribution/config.yml:ro
     depends_on:
       manager:
         condition: service_healthy

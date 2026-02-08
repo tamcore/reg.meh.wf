@@ -23,10 +23,10 @@ spec:
                 - /bin/registry
                 - garbage-collect
                 - --delete-untagged={{ .Values.registry.gc.deleteUntagged }}
-                - /etc/docker/registry/config.yml
+                - /etc/distribution/config.yml
               volumeMounts:
                 - name: config
-                  mountPath: /etc/docker/registry
+                  mountPath: /etc/distribution
           volumes:
             - name: config
               secret:

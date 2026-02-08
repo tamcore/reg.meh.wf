@@ -32,7 +32,7 @@ spec:
             {{- end }}
           volumeMounts:
             - name: config
-              mountPath: /etc/docker/registry
+              mountPath: /etc/distribution
             {{- if not $isS3 }}
             - name: data
               mountPath: /var/lib/registry
