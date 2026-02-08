@@ -147,19 +147,46 @@
             margin-bottom: 1.5rem;
         }
 
-        .example-group {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 1.25rem;
-            margin-bottom: 1rem;
+        .examples > input[type="radio"] {
+            display: none;
         }
 
-        .example-group h3 {
-            font-size: 0.95rem;
+        .examples > label {
+            display: inline-block;
+            padding: 0.6rem 1.25rem;
+            font-size: 0.85rem;
             font-weight: 600;
-            margin-bottom: 0.75rem;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .examples > label:hover {
+            color: var(--text);
+        }
+
+        .examples > input[type="radio"]:checked + label {
             color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-panels {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0 0 10px 10px;
+            padding: 1.25rem;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        #tab-docker:checked ~ .tab-panels .panel-docker,
+        #tab-podman:checked ~ .tab-panels .panel-podman,
+        #tab-helm:checked ~ .tab-panels .panel-helm,
+        #tab-oras:checked ~ .tab-panels .panel-oras {
+            display: block;
         }
 
         .steps {
@@ -257,46 +284,53 @@
         <div class="examples">
             <h2>Works With Everything</h2>
 
-            <div class="example-group">
-                <h3>Docker</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">docker build -t <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span> .</span>
-                </div>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">docker push <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span></span>
-                </div>
-            </div>
+            <input type="radio" name="example-tab" id="tab-docker" checked>
+            <label for="tab-docker">Docker</label>
+            <input type="radio" name="example-tab" id="tab-podman">
+            <label for="tab-podman">Podman</label>
+            <input type="radio" name="example-tab" id="tab-helm">
+            <label for="tab-helm">Helm</label>
+            <input type="radio" name="example-tab" id="tab-oras">
+            <label for="tab-oras">ORAS</label>
 
-            <div class="example-group">
-                <h3>Podman</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">podman build -t <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">30m</span> .</span>
+            <div class="tab-panels">
+                <div class="tab-panel panel-docker">
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">docker build -t <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span> .</span>
+                    </div>
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">docker push <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span></span>
+                    </div>
                 </div>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">podman push <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">30m</span></span>
-                </div>
-            </div>
 
-            <div class="example-group">
-                <h3>Helm</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">helm package my-chart/</span>
+                <div class="tab-panel panel-podman">
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">podman build -t <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">30m</span> .</span>
+                    </div>
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">podman push <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">30m</span></span>
+                    </div>
                 </div>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">helm push my-chart-0.1.0.tgz oci://<span style="color:var(--accent)">{{.Hostname}}</span>/charts:<span style="color:var(--green)">6h</span></span>
-                </div>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">helm install my-release oci://<span style="color:var(--accent)">{{.Hostname}}</span>/charts/my-chart --version 0.1.0</span>
-                </div>
-            </div>
 
-            <div class="example-group">
-                <h3>ORAS (OCI Artifacts)</h3>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">oras push <span style="color:var(--accent)">{{.Hostname}}</span>/my-artifact:<span style="color:var(--green)">24h</span> ./file.txt</span>
+                <div class="tab-panel panel-helm">
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">helm package my-chart/</span>
+                    </div>
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">helm push my-chart-0.1.0.tgz oci://<span style="color:var(--accent)">{{.Hostname}}</span>/charts:<span style="color:var(--green)">6h</span></span>
+                    </div>
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">helm install my-release oci://<span style="color:var(--accent)">{{.Hostname}}</span>/charts/my-chart --version 0.1.0</span>
+                    </div>
                 </div>
-                <div class="code-block">
-                    <span class="prompt">$</span> <span class="cmd">oras pull <span style="color:var(--accent)">{{.Hostname}}</span>/my-artifact:<span style="color:var(--green)">24h</span></span>
+
+                <div class="tab-panel panel-oras">
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">oras push <span style="color:var(--accent)">{{.Hostname}}</span>/my-artifact:<span style="color:var(--green)">24h</span> ./file.txt</span>
+                    </div>
+                    <div class="code-block">
+                        <span class="prompt">$</span> <span class="cmd">oras pull <span style="color:var(--accent)">{{.Hostname}}</span>/my-artifact:<span style="color:var(--green)">24h</span></span>
+                    </div>
                 </div>
             </div>
         </div>
