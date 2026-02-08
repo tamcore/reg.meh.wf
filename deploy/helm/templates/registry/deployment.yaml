@@ -1,11 +1,13 @@
-{{- if eq .Values.registry.storage.mode "s3" }}
----
+{{- $isS3 := eq .Values.registry.storage.mode "s3" }}
 apiVersion: apps/v1
-kind: Deployment
+kind: {{ if $isS3 }}Deployment{{ else }}StatefulSet{{ end }}
 metadata:
   name: {{ .Release.Name }}-registry
 spec:
-  replicas: {{ .Values.registry.replicas }}
+  {{- if not $isS3 }}
+  serviceName: {{ .Release.Name }}-registry
+  {{- end }}
+  replicas: {{ if $isS3 }}{{ .Values.registry.replicas }}{{ else }}1{{ end }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-registry
@@ -29,8 +31,24 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/docker/registry
+            {{- if not $isS3 }}
+            - name: data
+              mountPath: /var/lib/registry
+            {{- end }}
       volumes:
         - name: config
           secret:
             secretName: {{ .Release.Name }}-registry-config
-{{- end }}
+  {{- if not $isS3 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.registry.storage.filesystem.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.registry.storage.filesystem.size }}
+  {{- end }}
