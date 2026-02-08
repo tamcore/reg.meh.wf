@@ -10,7 +10,7 @@ import (
 )
 
 func TestHandler_ServesPage(t *testing.T) {
-	h, err := NewHandler("reg.test.dev", time.Hour, 24*time.Hour, slog.Default())
+	h, err := NewHandler("reg.test.dev", time.Hour, 24*time.Hour, "v0.1.0", slog.Default())
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}

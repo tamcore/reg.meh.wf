@@ -114,7 +114,7 @@ func serveCmd() *cobra.Command {
 			)
 			mux.Handle("POST /v1/hook/registry-event", hookHandler)
 
-			webHandler, err := web.NewHandler(cfg.Hostname, cfg.DefaultTTL, cfg.MaxTTL, logger.With("component", "web"))
+			webHandler, err := web.NewHandler(cfg.Hostname, cfg.DefaultTTL, cfg.MaxTTL, version, logger.With("component", "web"))
 			if err != nil {
 				return fmt.Errorf("creating web handler: %w", err)
 			}

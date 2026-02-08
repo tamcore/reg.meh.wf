@@ -18,6 +18,7 @@ type TemplateData struct {
 	Hostname   string
 	DefaultTTL string
 	MaxTTL     string
+	Version    string
 }
 
 // Handler serves the embedded landing page.
@@ -28,7 +29,9 @@ type Handler struct {
 
 // NewHandler creates a new web handler that renders the landing page
 // with the given hostname and TTL values.
-func NewHandler(hostname string, defaultTTL, maxTTL time.Duration, logger *slog.Logger) (*Handler, error) {
+func NewHandler(
+	hostname string, defaultTTL, maxTTL time.Duration, version string, logger *slog.Logger,
+) (*Handler, error) {
 	tmplBytes, err := staticFS.ReadFile("static/index.html")
 	if err != nil {
 		return nil, err
@@ -43,6 +46,7 @@ func NewHandler(hostname string, defaultTTL, maxTTL time.Duration, logger *slog.
 		Hostname:   hostname,
 		DefaultTTL: formatDuration(defaultTTL),
 		MaxTTL:     formatDuration(maxTTL),
+		Version:    version,
 	}
 
 	var buf bytes.Buffer
