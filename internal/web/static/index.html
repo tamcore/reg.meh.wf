@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Hostname}} — Ephemeral Container Registry</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #13131a;
+            --border: #23232f;
+            --text: #e4e4ef;
+            --muted: #8888a0;
+            --accent: #6c5ce7;
+            --accent-glow: rgba(108, 92, 231, 0.15);
+            --code-bg: #1a1a24;
+            --green: #2ecc71;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        header {
+            padding: 3rem 0 1rem;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        header h1 span { color: var(--accent); }
+
+        .tagline {
+            color: var(--muted);
+            margin-top: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .hero {
+            margin: 2rem 0;
+            padding: 2rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .hero p {
+            color: var(--muted);
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin: 0.75rem 0;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+
+        .code-block .prompt { color: var(--accent); }
+        .code-block .cmd { color: var(--text); }
+
+        .ttl-options {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+
+        .ttl-pill {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.4rem 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--accent);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        @media (max-width: 600px) {
+            .features { grid-template-columns: 1fr; }
+        }
+
+        .feature {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+        }
+
+        .feature h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+        }
+
+        .feature p {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .how-it-works {
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .how-it-works h2 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+        }
+
+        .steps {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .step {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            flex: 1;
+            min-width: 180px;
+            max-width: 220px;
+        }
+
+        .step .number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--accent-glow);
+            border: 1px solid var(--accent);
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.75rem;
+        }
+
+        .step h4 { font-size: 0.9rem; margin-bottom: 0.3rem; }
+        .step p { font-size: 0.8rem; color: var(--muted); }
+
+        footer {
+            text-align: center;
+            padding: 3rem 0 2rem;
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span>{{.Hostname}}</span></h1>
+            <p class="tagline">Ephemeral container registry. Push, pull, forget.</p>
+        </header>
+
+        <div class="hero">
+            <p>Push any OCI image with a TTL tag. It auto-expires. No sign-up, no auth.</p>
+            <div class="code-block">
+                <span class="prompt">$</span> <span class="cmd">docker tag myapp <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span></span>
+            </div>
+            <div class="code-block">
+                <span class="prompt">$</span> <span class="cmd">docker push <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span></span>
+            </div>
+        </div>
+
+        <div class="ttl-options">
+            <span class="ttl-pill">:5m</span>
+            <span class="ttl-pill">:30m</span>
+            <span class="ttl-pill">:1h</span>
+            <span class="ttl-pill">:6h</span>
+            <span class="ttl-pill">:24h</span>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <h3>🔓 No Auth Required</h3>
+                <p>Push and pull without tokens, passwords, or API keys.</p>
+            </div>
+            <div class="feature">
+                <h3>⏱️ Auto-Expiring</h3>
+                <p>Set a TTL from minutes to {{.MaxTTL}}. Images vanish when time is up.</p>
+            </div>
+            <div class="feature">
+                <h3>📦 OCI Compatible</h3>
+                <p>Works with Docker, Podman, Helm, and any OCI tooling.</p>
+            </div>
+            <div class="feature">
+                <h3>🔒 Private</h3>
+                <p>No tracking, no logging, no analytics. Your images are your business.</p>
+            </div>
+        </div>
+
+        <div class="how-it-works">
+            <h2>How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="number">1</div>
+                    <h4>Tag</h4>
+                    <p>Add a TTL to your image tag. Default: {{.DefaultTTL}}.</p>
+                </div>
+                <div class="step">
+                    <div class="number">2</div>
+                    <h4>Push</h4>
+                    <p>Push to {{.Hostname}} — no credentials needed.</p>
+                </div>
+                <div class="step">
+                    <div class="number">3</div>
+                    <h4>Use</h4>
+                    <p>Pull from anywhere. When the TTL expires, it's gone.</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            Powered by <a href="https://github.com/tamcore/reg.meh.wf">reg.meh.wf</a>
+        </footer>
+    </div>
+</body>
+</html>
