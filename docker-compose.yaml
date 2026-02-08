@@ -1,0 +1,49 @@
+services:
+  registry:
+    image: registry:2
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+      - ./deploy/docker-compose/registry-config.yml:/etc/docker/registry/config.yml:ro
+    depends_on:
+      manager:
+        condition: service_healthy
+
+  manager:
+    image: ${MANAGER_IMAGE:-ko.local/reg-meh-wf:latest}
+    command: ["serve"]
+    environment:
+      REDIS_URL: redis://redis:6379
+      HOOK_TOKEN: compose-hook-token
+      REGISTRY_URL: http://registry:5000
+      HOSTNAME_OVERRIDE: localhost:5000
+      DEFAULT_TTL: 1h
+      MAX_TTL: 24h
+      REAP_INTERVAL: 1m
+      LOG_FORMAT: json
+      PORT: "8000"
+      INTERNAL_PORT: "9090"
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "/ko-app/cmd", "version"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 3s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  registry-data:

@@ -29,3 +29,67 @@ jobs:
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9
         with:
           version: latest
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        with:
+          go-version-file: 'go.mod'
+
+      - uses: ko-build/setup-ko@d006021bd0c28d1ce33a07e7943d48b079944c8d # v0.9
+
+      - name: Build manager image with ko
+        run: |
+          export KO_DOCKER_REPO=ko.local
+          MANAGER_IMAGE=$(ko build --bare --local ./cmd/)
+          echo "MANAGER_IMAGE=$MANAGER_IMAGE" >> "$GITHUB_ENV"
+          echo "Built image: $MANAGER_IMAGE"
+
+      - name: Start stack
+        run: docker compose up -d --wait --wait-timeout 60
+
+      - name: Verify manager health
+        run: |
+          curl -sf http://localhost:8000/ | grep -q "Ephemeral Container Registry"
+          echo "✅ Landing page OK"
+
+      - name: Push image to local registry
+        run: |
+          IMAGE="localhost:5000/e2e-test:5m"
+          docker pull busybox:latest
+          docker tag busybox:latest "$IMAGE"
+          docker push "$IMAGE"
+          echo "✅ Push OK"
+
+      - name: Pull image back
+        run: |
+          IMAGE="localhost:5000/e2e-test:5m"
+          docker rmi "$IMAGE"
+          docker pull "$IMAGE"
+          echo "✅ Pull OK"
+
+      - name: Run pulled image
+        run: |
+          docker run --rm localhost:5000/e2e-test:5m echo "hello from e2e"
+          echo "✅ Run OK"
+
+      - name: Verify TTL tracking
+        run: |
+          # Give webhook a moment to process
+          sleep 2
+          METRICS=$(curl -sf http://localhost:9090/metrics)
+          echo "$METRICS" | grep -q 'regmehwf_hooks_images_tracked_total'
+          TRACKED=$(echo "$METRICS" | grep '^regmehwf_hooks_images_tracked_total' | awk '{print $2}')
+          if [ "$TRACKED" -lt 1 ]; then
+            echo "❌ Expected at least 1 tracked image, got $TRACKED"
+            exit 1
+          fi
+          echo "✅ Metrics OK — $TRACKED image(s) tracked"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
