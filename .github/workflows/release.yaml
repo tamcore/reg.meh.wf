@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REPOSITORY: ghcr.io/${{ github.repository_owner }}/reg-meh-wf
+  CHART_DIR: deploy/helm
+  CHART_REPOSITORY: ghcr.io/${{ github.repository_owner }}/charts
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        with:
+          go-version-file: 'go.mod'
+
+      - uses: ko-build/setup-ko@d006021bd0c28d1ce33a07e7943d48b079944c8d # v0.9
+
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KO_DOCKER_REPO: ${{ env.REPOSITORY }}
+        with:
+          version: latest
+          args: release
+
+  chart-release:
+    runs-on: ubuntu-latest
+    needs: [goreleaser]
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: Install Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+
+      - name: Login to registry
+        run: |
+          echo '${{ secrets.GITHUB_TOKEN }}' | \
+            helm registry login \
+              -u '${{ github.actor }}' \
+              --password-stdin \
+              ghcr.io
+
+      - name: Install yq
+        env:
+          YQ_VERSION: "v4.35.2"
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 -O /usr/bin/yq && \
+            sudo chmod +x /usr/bin/yq
+
+      - name: Update Chart
+        env:
+          VERSION: "${{ github.ref_name }}"
+          REPOSITORY: "${{ env.REPOSITORY }}"
+        run: |
+          yq -i '.version = strenv(VERSION)' '${{ env.CHART_DIR }}/Chart.yaml'
+          yq -i '.appVersion = strenv(VERSION)' '${{ env.CHART_DIR }}/Chart.yaml'
+
+      - name: Package chart
+        run: |
+          echo PACKAGE=$(helm package ${{ env.CHART_DIR }} -u | cut -d " " -f 8) >> ${GITHUB_ENV}
+
+      - name: Push chart
+        run: |
+          helm push \
+            ${{ env.PACKAGE }} \
+            oci://${{ env.CHART_REPOSITORY }}
+
+      - name: Template Chart
+        run: |
+          helm template \
+            ${GITHUB_REPOSITORY#*/} \
+            ${{ env.CHART_DIR }} > install.yaml
+
+      - name: Upload manifest to release
+        uses: svenstaro/upload-release-action@6b7fa9f267e90b50a19fef07b3596790bb941741 # v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: install.yaml
+          tag: ${{ github.ref }}
