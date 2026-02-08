@@ -7,8 +7,11 @@ import (
 
 // Config holds all configuration for the application.
 type Config struct {
-	// Port for the HTTP server.
+	// Port for the public HTTP server (webhook + landing page).
 	Port int
+
+	// InternalPort for health/readiness probes and metrics (not publicly exposed).
+	InternalPort int
 
 	// RedisURL is the Redis connection URL.
 	RedisURL string

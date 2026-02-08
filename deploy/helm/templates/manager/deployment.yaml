@@ -24,6 +24,8 @@ spec:
               value: {{ .Values.registry.hookToken | default "change-me" }}
             - name: PORT
               value: "8000"
+            - name: INTERNAL_PORT
+              value: "9090"
             - name: REGISTRY_URL
               value: http://{{ .Release.Name }}-registry:5000
             - name: HOSTNAME_OVERRIDE
@@ -39,15 +41,17 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+            - containerPort: 9090
+              name: internal
           livenessProbe:
             httpGet:
               path: /healthz
-              port: http
+              port: internal
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /healthz
-              port: http
+              path: /readyz
+              port: internal
             initialDelaySeconds: 3
             periodSeconds: 5

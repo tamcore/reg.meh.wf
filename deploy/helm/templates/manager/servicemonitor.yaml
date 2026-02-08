@@ -1,5 +1,19 @@
 {{- if .Values.manager.metrics.serviceMonitor.enabled }}
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-manager-metrics
+  labels:
+    app: {{ .Release.Name }}-manager
+spec:
+  selector:
+    app: {{ .Release.Name }}-manager
+  ports:
+    - port: 9090
+      targetPort: internal
+      name: metrics
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -11,6 +25,6 @@ spec:
     matchLabels:
       app: {{ .Release.Name }}-manager
   endpoints:
-    - port: http
+    - port: metrics
       path: /metrics
 {{- end }}

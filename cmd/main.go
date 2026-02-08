@@ -43,6 +43,7 @@ func main() {
 func newConfig() *config.Config {
 	return &config.Config{
 		Port:         envInt("PORT", 8000),
+		InternalPort: envInt("INTERNAL_PORT", 9090),
 		RedisURL:     envStr("REDIS_URL", envStr("REDISCLOUD_URL", "redis://localhost:6379")),
 		HookToken:    envStr("HOOK_TOKEN", ""),
 		RegistryURL:  envStr("REGISTRY_URL", "http://localhost:5000"),
@@ -94,7 +95,7 @@ func serveCmd() *cobra.Command {
 			r := reaper.New(rdb, cfg.RegistryURL, logger.With("component", "reaper"))
 			go r.RunLoop(ctx, cfg.ReapInterval)
 
-			// Set up HTTP routes.
+			// Set up public HTTP routes (webhook + landing page).
 			mux := http.NewServeMux()
 
 			hookHandler := hooks.NewHandler(
@@ -103,31 +104,54 @@ func serveCmd() *cobra.Command {
 			)
 			mux.Handle("POST /v1/hook/registry-event", hookHandler)
 
-			mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`{"status":"ok"}`))
-			})
-
-			mux.Handle("GET /metrics", promhttp.Handler())
-
 			webHandler, err := web.NewHandler(cfg.Hostname, cfg.DefaultTTL, cfg.MaxTTL, logger.With("component", "web"))
 			if err != nil {
 				return fmt.Errorf("creating web handler: %w", err)
 			}
-			mux.Handle("GET /", webHandler)
+			mux.Handle("GET /{$}", webHandler)
+
+			// Set up internal HTTP routes (probes + metrics).
+			internalMux := http.NewServeMux()
+			internalMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
+			})
+			internalMux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+				if err := rdb.Ping(r.Context()); err != nil {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`{"status":"not ready"}`))
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
+			})
+			internalMux.Handle("GET /metrics", promhttp.Handler())
 
 			srv := &http.Server{
 				Addr:              fmt.Sprintf(":%d", cfg.Port),
 				Handler:           mux,
 				ReadHeaderTimeout: 5 * time.Second,
 			}
+			internalSrv := &http.Server{
+				Addr:              fmt.Sprintf(":%d", cfg.InternalPort),
+				Handler:           internalMux,
+				ReadHeaderTimeout: 5 * time.Second,
+			}
 
 			go func() {
 				<-ctx.Done()
-				logger.Info("shutting down HTTP server")
+				logger.Info("shutting down HTTP servers")
 				shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer shutdownCancel()
 				_ = srv.Shutdown(shutdownCtx)
+				_ = internalSrv.Shutdown(shutdownCtx)
+			}()
+
+			go func() {
+				logger.Info("starting internal server", "port", cfg.InternalPort)
+				if err := internalSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					logger.Error("internal server failed", "error", err)
+				}
 			}()
 
 			logger.Info("starting server", "port", cfg.Port)
