@@ -16,7 +16,9 @@ import (
 	"github.com/tamcore/ephemeron/internal/config"
 	"github.com/tamcore/ephemeron/internal/hooks"
 	"github.com/tamcore/ephemeron/internal/reaper"
+	recoverlib "github.com/tamcore/ephemeron/internal/recover"
 	redisclient "github.com/tamcore/ephemeron/internal/redis"
+	"github.com/tamcore/ephemeron/internal/registry"
 	"github.com/tamcore/ephemeron/internal/web"
 )
 
@@ -33,6 +35,7 @@ func main() {
 
 	rootCmd.AddCommand(serveCmd())
 	rootCmd.AddCommand(reapCmd())
+	rootCmd.AddCommand(recoverCmd())
 	rootCmd.AddCommand(versionCmd())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -90,6 +93,13 @@ func serveCmd() *cobra.Command {
 				return fmt.Errorf("redis ping failed: %w", err)
 			}
 			logger.Info("connected to redis")
+
+			// Auto-recover if Redis is not initialized.
+			reg := registry.New(cfg.RegistryURL)
+			rec := recoverlib.New(rdb, reg, cfg.DefaultTTL, cfg.MaxTTL, logger.With("component", "recover"))
+			if err := rec.RunIfNeeded(ctx); err != nil {
+				logger.Error("auto-recovery failed", "error", err)
+			}
 
 			// Start reaper in background.
 			r := reaper.New(rdb, cfg.RegistryURL, logger.With("component", "reaper"))
@@ -184,6 +194,37 @@ func reapCmd() *cobra.Command {
 			ctx := context.Background()
 			r := reaper.New(rdb, cfg.RegistryURL, logger.With("component", "reaper"))
 			return r.ReapOnce(ctx)
+		},
+	}
+}
+
+func recoverCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "recover",
+		Short: "Re-populate Redis by scanning the registry catalog",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg := newConfig()
+			if err := cfg.Validate(); err != nil {
+				return err
+			}
+
+			logger := setupLogger(cfg.LogFormat)
+
+			rdb, err := redisclient.New(cfg.RedisURL)
+			if err != nil {
+				return fmt.Errorf("connecting to redis: %w", err)
+			}
+			defer func() { _ = rdb.Close() }()
+
+			ctx := context.Background()
+			reg := registry.New(cfg.RegistryURL)
+			rec := recoverlib.New(rdb, reg, cfg.DefaultTTL, cfg.MaxTTL, logger.With("component", "recover"))
+
+			if err := rec.Run(ctx); err != nil {
+				return err
+			}
+
+			return rdb.SetInitialized(ctx)
 		},
 	}
 }

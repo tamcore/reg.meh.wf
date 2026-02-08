@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	imagesKey     = "current.images"
-	reaperLockKey = "reaper.lock"
+	imagesKey      = "current.images"
+	reaperLockKey  = "reaper.lock"
+	initializedKey = "ephemeron:initialized"
 )
 
 // Client wraps the Redis client with ttl.sh-compatible operations.
@@ -83,4 +84,23 @@ func (c *Client) AcquireReaperLock(ctx context.Context, ttl time.Duration) (bool
 // ReleaseReaperLock releases the distributed reaper lock.
 func (c *Client) ReleaseReaperLock(ctx context.Context) error {
 	return c.rdb.Del(ctx, reaperLockKey).Err()
+}
+
+// IsInitialized checks if ephemeron has been initialized (i.e. Redis has been populated).
+func (c *Client) IsInitialized(ctx context.Context) (bool, error) {
+	val, err := c.rdb.Exists(ctx, initializedKey).Result()
+	if err != nil {
+		return false, err
+	}
+	return val > 0, nil
+}
+
+// SetInitialized marks Redis as initialized.
+func (c *Client) SetInitialized(ctx context.Context) error {
+	return c.rdb.Set(ctx, initializedKey, "true", 0).Err()
+}
+
+// ImageCount returns the number of tracked images.
+func (c *Client) ImageCount(ctx context.Context) (int64, error) {
+	return c.rdb.SCard(ctx, imagesKey).Result()
 }

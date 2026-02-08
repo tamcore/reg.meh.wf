@@ -15,4 +15,7 @@ type Store interface {
 	RemoveImage(ctx context.Context, imageWithTag string) error
 	AcquireReaperLock(ctx context.Context, ttl time.Duration) (bool, error)
 	ReleaseReaperLock(ctx context.Context) error
+	IsInitialized(ctx context.Context) (bool, error)
+	SetInitialized(ctx context.Context) error
+	ImageCount(ctx context.Context) (int64, error)
 }
