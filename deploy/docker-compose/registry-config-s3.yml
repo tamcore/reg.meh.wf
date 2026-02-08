@@ -1,0 +1,36 @@
+version: 0.1
+log:
+  level: info
+  formatter: text
+storage:
+  delete:
+    enabled: true
+  s3:
+    region: us-east-1
+    bucket: registry
+    accesskey: minioadmin
+    secretkey: minioadmin
+    regionendpoint: http://minio:9000
+  redirect:
+    disable: true
+  cache:
+    blobdescriptor: inmemory
+http:
+  addr: 0.0.0.0:5000
+  secret: compose-secret
+  debug:
+    addr: 0.0.0.0:5001
+    prometheus:
+      enabled: true
+notifications:
+  events:
+    includereferences: true
+  endpoints:
+    - name: registry-hooks
+      disabled: false
+      url: http://manager:8000/v1/hook/registry-event
+      headers:
+        Authorization: ["Token compose-hook-token"]
+      timeout: 1s
+      threshold: 10
+      backoff: 1s

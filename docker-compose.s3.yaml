@@ -1,0 +1,68 @@
+name: ephemeron-s3
+
+services:
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "minio", "--version"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  minio-init:
+    image: cgr.dev/chainguard/minio-client:latest-dev
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "mc alias set local http://minio:9000 minioadmin minioadmin && mc mb --ignore-existing local/registry"]
+
+  registry:
+    image: registry:2
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./deploy/docker-compose/registry-config-s3.yml:/etc/docker/registry/config.yml:ro
+    depends_on:
+      manager:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  manager:
+    image: ${MANAGER_IMAGE:-ko.local/ephemeron:latest}
+    command: ["serve"]
+    environment:
+      REDIS_URL: redis://redis:6379
+      HOOK_TOKEN: compose-hook-token
+      REGISTRY_URL: http://registry:5000
+      HOSTNAME_OVERRIDE: localhost:5000
+      DEFAULT_TTL: 1h
+      MAX_TTL: 24h
+      REAP_INTERVAL: 1m
+      LOG_FORMAT: json
+      PORT: "8000"
+      INTERNAL_PORT: "9090"
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "/ko-app/cmd", "version"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 3s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
