@@ -44,6 +44,7 @@ bin/ephemeron serve
 |-----------|--------------------------------------------------------------|
 | `serve`   | Start the webhook server, reaper loop, and landing page      |
 | `reap`    | Run a single reap cycle (useful for CronJobs)                |
+| `recover` | Re-populate Redis by scanning the registry catalog           |
 | `version` | Print version and commit info                                |
 
 ## Configuration
@@ -64,6 +65,14 @@ All configuration is done via environment variables.
 | `LOG_FORMAT`         | `json`                   | Log format (`json` or `text`)            |
 
 `REDISCLOUD_URL` is also supported as an alias for `REDIS_URL`.
+
+## Recovery
+
+Ephemeron tracks image expiry data in Redis. If Redis data is lost, images in the registry become untracked orphans that will never be reaped.
+
+**Automatic recovery:** On `serve` startup, if Redis has not been initialized (no `ephemeron:initialized` key), Ephemeron automatically scans the registry catalog, parses TTLs from image tags, and re-populates tracking data.
+
+**Manual recovery:** Run `ephemeron recover` to force a full re-scan at any time. This is idempotent and safe to run repeatedly.
 
 ## Deployment
 
