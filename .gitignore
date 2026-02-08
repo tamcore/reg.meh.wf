@@ -4,3 +4,4 @@ cover.out
 *.exe
 deploy/helm/charts/
 deploy/helm/Chart.lock
+.DS_Store
