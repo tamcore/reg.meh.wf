@@ -44,8 +44,7 @@ jobs:
 
       - name: Build manager image with ko
         run: |
-          export KO_DOCKER_REPO=ko.local
-          MANAGER_IMAGE=$(ko build --bare --local ./cmd/)
+          MANAGER_IMAGE=$(KO_DOCKER_REPO=ko.local ko build --bare ./cmd/)
           echo "MANAGER_IMAGE=$MANAGER_IMAGE" >> "$GITHUB_ENV"
           echo "Built image: $MANAGER_IMAGE"
 
