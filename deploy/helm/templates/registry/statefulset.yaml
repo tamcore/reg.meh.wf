@@ -1,0 +1,50 @@
+{{- if ne .Values.registry.storage.mode "s3" }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-registry
+spec:
+  serviceName: {{ .Release.Name }}-registry
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-registry
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/registry/secret.yaml") . | sha256sum }}
+      labels:
+        app: {{ .Release.Name }}-registry
+    spec:
+      containers:
+        - name: registry
+          image: {{ .Values.registry.image.repository }}:{{ .Values.registry.image.tag }}
+          ports:
+            - containerPort: 5000
+              name: registry
+            {{- if .Values.registry.metrics.enabled }}
+            - containerPort: 5001
+              name: metrics
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/docker/registry
+            - name: data
+              mountPath: /var/lib/registry
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ .Release.Name }}-registry-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.registry.storage.filesystem.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.registry.storage.filesystem.size }}
+{{- end }}

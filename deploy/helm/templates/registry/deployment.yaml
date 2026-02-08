@@ -1,0 +1,36 @@
+{{- if eq .Values.registry.storage.mode "s3" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-registry
+spec:
+  replicas: {{ .Values.registry.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-registry
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/registry/secret.yaml") . | sha256sum }}
+      labels:
+        app: {{ .Release.Name }}-registry
+    spec:
+      containers:
+        - name: registry
+          image: {{ .Values.registry.image.repository }}:{{ .Values.registry.image.tag }}
+          ports:
+            - containerPort: 5000
+              name: registry
+            {{- if .Values.registry.metrics.enabled }}
+            - containerPort: 5001
+              name: metrics
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/docker/registry
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ .Release.Name }}-registry-config
+{{- end }}

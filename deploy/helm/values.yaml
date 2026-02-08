@@ -1,0 +1,150 @@
+# -- Sidecar service (hooks + reaper + landing page in one Go binary)
+sidecar:
+  image:
+    # -- Container image repository
+    repository: ghcr.io/tamcore/reg-meh-wf
+    # -- Image tag (defaults to Chart.appVersion)
+    tag: ""
+  # -- Number of sidecar replicas
+  replicas: 1
+  env:
+    # -- Default TTL for images without a parseable duration tag
+    defaultTTL: "1h"
+    # -- Maximum allowed TTL
+    maxTTL: "24h"
+    # -- Reaper check interval
+    reapInterval: "1m"
+    # -- Log format: "json" or "text"
+    logFormat: "json"
+
+# -- OCI/Docker registry (distribution/distribution)
+registry:
+  image:
+    # -- Container image repository for the registry
+    repository: registry
+    # -- Image tag
+    tag: "2"
+  # -- HMAC secret used to sign blob upload session tokens.
+  # Must be identical across all replicas. Use a long random string (e.g. 64 hex chars).
+  # If left empty, each pod generates its own random secret, breaking multi-replica setups.
+  # Generate with: openssl rand -hex 32
+  secret: ""
+  # -- Shared token used to authenticate webhook notifications from the registry to the sidecar.
+  # Must match on both sides. If left empty, a default placeholder is used.
+  # Generate with: openssl rand -hex 16
+  hookToken: ""
+  # -- Number of registry replicas. Only >1 when using S3 storage mode.
+  replicas: 1
+  cache:
+    # -- Blob descriptor cache: "inmemory" (per-pod) or "redis" (shared via redis-ha).
+    blobdescriptor: inmemory
+  gc:
+    # -- Enable periodic garbage collection to remove orphaned blobs
+    enabled: false
+    # -- Cron schedule for garbage collection (default: daily at 3am)
+    schedule: "0 3 * * *"
+    # -- Also delete blobs referenced by untagged manifests.
+    deleteUntagged: false
+    # -- Number of successful GC jobs to keep
+    successfulJobsHistoryLimit: 1
+    # -- Number of failed GC jobs to keep
+    failedJobsHistoryLimit: 3
+  metrics:
+    # -- Expose Prometheus metrics on port 5001 (/metrics)
+    enabled: true
+    serviceMonitor:
+      # -- Create a ServiceMonitor resource for Prometheus Operator
+      enabled: false
+  storage:
+    # -- Storage backend: "filesystem" (single-replica StatefulSet with PVC) or "s3" (multi-replica Deployment)
+    mode: filesystem
+    filesystem:
+      # -- PVC size for filesystem storage mode
+      size: 50Gi
+      # -- StorageClass for the PVC (uses cluster default if unset)
+      # storageClass: ""
+    s3:
+      # -- S3 region
+      region: ""
+      # -- S3 bucket name
+      bucket: ""
+      # -- S3 access key ID
+      accessKey: ""
+      # -- S3 secret access key
+      secretKey: ""
+      # -- S3 endpoint URL (required for non-AWS S3, e.g. https://s3.eu-central-3.ionoscloud.com)
+      # endpoint: ""
+      # -- Enable S3 storage redirects (clients download blobs directly from S3 via presigned URLs).
+      redirect: true
+
+# -- Ingress configuration
+ingress:
+  # -- Hostname for the registry
+  host: ""
+  # -- Annotations applied to both registry and sidecar ingresses.
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+# -- Redis HA subchart configuration
+redis-ha:
+  hardAntiAffinity: false
+  replicas: 2
+  redis:
+    masterGroupName: ttl-sh
+    config:
+      save: '"60 1"'
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+  init:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        memory: 100Mi
+  sentinel:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        memory: 64Mi
+  splitBrainDetection:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 64Mi
+  exporter:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 64Mi
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  persistentVolume:
+    enabled: true
+    size: 1Gi
+  haproxy:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        memory: 100Mi
+    replicas: 1
+    hardAntiAffinity: false
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true

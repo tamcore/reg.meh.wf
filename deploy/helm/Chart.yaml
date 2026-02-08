@@ -1,0 +1,12 @@
+---
+apiVersion: v2
+name: reg-meh-wf
+description: Self-hosted ephemeral container registry
+type: application
+version: 0.0.1
+appVersion: latest
+
+dependencies:
+  - name: redis-ha
+    version: 6.2.5
+    repository: oci://ghcr.io/tamcore/charts

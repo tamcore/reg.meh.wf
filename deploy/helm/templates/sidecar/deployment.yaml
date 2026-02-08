@@ -1,0 +1,53 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-sidecar
+spec:
+  replicas: {{ .Values.sidecar.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-sidecar
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-sidecar
+    spec:
+      containers:
+        - name: sidecar
+          image: {{ .Values.sidecar.image.repository }}:{{ coalesce .Values.sidecar.image.tag .Chart.AppVersion }}
+          args: ["serve"]
+          env:
+            - name: REDIS_URL
+              value: redis://{{ .Release.Name }}-redis-ha-haproxy:6379
+            - name: HOOK_TOKEN
+              value: {{ .Values.registry.hookToken | default "change-me" }}
+            - name: PORT
+              value: "8000"
+            - name: REGISTRY_URL
+              value: http://{{ .Release.Name }}-registry:5000
+            - name: HOSTNAME_OVERRIDE
+              value: {{ .Values.ingress.host }}
+            - name: DEFAULT_TTL
+              value: {{ .Values.sidecar.env.defaultTTL | default "1h" | quote }}
+            - name: MAX_TTL
+              value: {{ .Values.sidecar.env.maxTTL | default "24h" | quote }}
+            - name: REAP_INTERVAL
+              value: {{ .Values.sidecar.env.reapInterval | default "1m" | quote }}
+            - name: LOG_FORMAT
+              value: {{ .Values.sidecar.env.logFormat | default "json" | quote }}
+          ports:
+            - containerPort: 8000
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5

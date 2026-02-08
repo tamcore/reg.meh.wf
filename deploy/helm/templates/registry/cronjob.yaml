@@ -1,0 +1,32 @@
+{{- if .Values.registry.gc.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-registry-gc
+spec:
+  schedule: {{ .Values.registry.gc.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.registry.gc.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.registry.gc.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: gc
+              image: {{ .Values.registry.image.repository }}:{{ .Values.registry.image.tag }}
+              command:
+                - /bin/registry
+                - garbage-collect
+                - --delete-untagged={{ .Values.registry.gc.deleteUntagged }}
+                - /etc/docker/registry/config.yml
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/docker/registry
+          volumes:
+            - name: config
+              secret:
+                secretName: {{ .Release.Name }}-registry-config
+{{- end }}
