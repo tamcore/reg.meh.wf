@@ -1,0 +1,16 @@
+package redis
+
+import (
+	"context"
+	"time"
+)
+
+// Store defines the interface for image TTL tracking operations.
+type Store interface {
+	Ping(ctx context.Context) error
+	Close() error
+	TrackImage(ctx context.Context, imageWithTag string, expiresAt time.Time) error
+	ListImages(ctx context.Context) ([]string, error)
+	GetExpiry(ctx context.Context, imageWithTag string) (int64, error)
+	RemoveImage(ctx context.Context, imageWithTag string) error
+}
