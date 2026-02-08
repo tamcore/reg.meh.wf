@@ -137,6 +137,31 @@
             margin-bottom: 1rem;
         }
 
+        .examples {
+            margin: 2.5rem 0;
+        }
+
+        .examples h2 {
+            font-size: 1.3rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .example-group {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .example-group h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--accent);
+        }
+
         .steps {
             display: flex;
             gap: 1rem;
@@ -226,6 +251,53 @@
             <div class="feature">
                 <h3>🔒 Private</h3>
                 <p>No tracking, no logging, no analytics. Your images are your business.</p>
+            </div>
+        </div>
+
+        <div class="examples">
+            <h2>Works With Everything</h2>
+
+            <div class="example-group">
+                <h3>Docker</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">docker build -t <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span> .</span>
+                </div>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">docker push <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">1h</span></span>
+                </div>
+            </div>
+
+            <div class="example-group">
+                <h3>Podman</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">podman build -t <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">30m</span> .</span>
+                </div>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">podman push <span style="color:var(--accent)">{{.Hostname}}</span>/myapp:<span style="color:var(--green)">30m</span></span>
+                </div>
+            </div>
+
+            <div class="example-group">
+                <h3>Helm</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">helm package my-chart/</span>
+                </div>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">helm push my-chart-0.1.0.tgz oci://<span style="color:var(--accent)">{{.Hostname}}</span>/charts:<span style="color:var(--green)">6h</span></span>
+                </div>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">helm install my-release oci://<span style="color:var(--accent)">{{.Hostname}}</span>/charts/my-chart --version 0.1.0</span>
+                </div>
+            </div>
+
+            <div class="example-group">
+                <h3>ORAS (OCI Artifacts)</h3>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">oras push <span style="color:var(--accent)">{{.Hostname}}</span>/my-artifact:<span style="color:var(--green)">24h</span> ./file.txt</span>
+                </div>
+                <div class="code-block">
+                    <span class="prompt">$</span> <span class="cmd">oras pull <span style="color:var(--accent)">{{.Hostname}}</span>/my-artifact:<span style="color:var(--green)">24h</span></span>
+                </div>
             </div>
         </div>
 
