@@ -2,21 +2,23 @@
 apiVersion: apps/v1
 kind: {{ if $isS3 }}Deployment{{ else }}StatefulSet{{ end }}
 metadata:
-  name: {{ .Release.Name }}-registry
+  name: {{ include "ephemeron.registry.fullname" . }}
+  labels:
+    {{- include "ephemeron.registry.labels" . | nindent 4 }}
 spec:
   {{- if not $isS3 }}
-  serviceName: {{ .Release.Name }}-registry
+  serviceName: {{ include "ephemeron.registry.fullname" . }}
   {{- end }}
   replicas: {{ if $isS3 }}{{ .Values.registry.replicas }}{{ else }}1{{ end }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-registry
+      {{- include "ephemeron.registry.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/registry/secret.yaml") . | sha256sum }}
       labels:
-        app: {{ .Release.Name }}-registry
+        {{- include "ephemeron.registry.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: registry
@@ -38,7 +40,7 @@ spec:
       volumes:
         - name: config
           secret:
-            secretName: {{ .Release.Name }}-registry-config
+            secretName: {{ include "ephemeron.registry.fullname" . }}-config
   {{- if not $isS3 }}
   volumeClaimTemplates:
     - metadata:

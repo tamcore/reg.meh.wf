@@ -2,7 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Release.Name }}-registry
+  name: {{ include "ephemeron.registry.fullname" . }}
+  labels:
+    {{- include "ephemeron.registry.labels" . | nindent 4 }}
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/server-snippet: |
@@ -17,7 +19,7 @@ spec:
         paths:
           - backend:
               service:
-                name: {{ .Release.Name }}-registry
+                name: {{ include "ephemeron.registry.fullname" . }}
                 port:
                   number: 5000
             path: /v2
@@ -25,4 +27,4 @@ spec:
   tls:
     - hosts:
         - {{ .Values.ingress.host }}
-      secretName: {{ .Release.Name }}-tls
+      secretName: {{ include "ephemeron.fullname" . }}-tls

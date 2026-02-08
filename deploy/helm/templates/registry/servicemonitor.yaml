@@ -2,13 +2,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ .Release.Name }}-registry
+  name: {{ include "ephemeron.registry.fullname" . }}
   labels:
-    app: {{ .Release.Name }}-registry
+    {{- include "ephemeron.registry.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-registry
+      {{- include "ephemeron.registry.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: metrics
       path: /metrics

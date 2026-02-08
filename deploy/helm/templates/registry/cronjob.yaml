@@ -3,7 +3,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ .Release.Name }}-registry-gc
+  name: {{ include "ephemeron.registry.fullname" . }}-gc
+  labels:
+    {{- include "ephemeron.registry.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.registry.gc.schedule | quote }}
   concurrencyPolicy: Forbid
@@ -28,5 +30,5 @@ spec:
           volumes:
             - name: config
               secret:
-                secretName: {{ .Release.Name }}-registry-config
+                secretName: {{ include "ephemeron.registry.fullname" . }}-config
 {{- end }}

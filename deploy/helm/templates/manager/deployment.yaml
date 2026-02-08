@@ -2,16 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-manager
+  name: {{ include "ephemeron.manager.fullname" . }}
+  labels:
+    {{- include "ephemeron.manager.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.manager.replicas }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-manager
+      {{- include "ephemeron.manager.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-manager
+        {{- include "ephemeron.manager.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: manager
@@ -27,7 +29,7 @@ spec:
             - name: INTERNAL_PORT
               value: "9090"
             - name: REGISTRY_URL
-              value: http://{{ .Release.Name }}-registry:5000
+              value: http://{{ include "ephemeron.registry.fullname" . }}:5000
             - name: HOSTNAME_OVERRIDE
               value: {{ .Values.ingress.host }}
             - name: DEFAULT_TTL
