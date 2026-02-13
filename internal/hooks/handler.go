@@ -93,6 +93,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"tag", event.Target.Tag,
 				"error", err,
 			)
+			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+			return
 		}
 	}
 

@@ -590,9 +590,9 @@ defer redis.Del("reaper.lock")
 
 - **Invalid JSON**: Returns `400 Bad Request`
 - **Missing auth**: Returns `401 Unauthorized`
-- **Redis failure**: Logs error, returns `200 OK` (webhook acknowledged but not processed)
+- **Redis failure**: Logs error, returns `503 Service Unavailable`
 
-**Rationale**: Don't fail webhooks due to transient Redis issues. Registry will retry anyway.
+**Rationale**: Registry retries failed webhooks automatically (with `threshold` and `backoff` configuration), ensuring eventual consistency when Redis recovers.
 
 ### Reaper
 
@@ -708,8 +708,7 @@ readinessProbe:
 
 1. **Image Size Tracking**: Store blob sizes, add metrics for disk space reclaimed
 2. **Granular Locking**: Per-image locks to allow parallel deletion
-3. **Webhook Retry Queue**: Persistent queue for failed tracking operations
-4. **Tag Immutability**: Detect and warn about tag overwrites
+3. **Tag Immutability**: Detect and warn about tag overwrites
 
 ### Architectural Constraints
 
