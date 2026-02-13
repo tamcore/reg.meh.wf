@@ -102,8 +102,9 @@ Content-Type: application/json
 4. **Parse TTL**: Extract duration from tag using regex pattern
 5. **Clamp TTL**: Apply `DEFAULT_TTL` (if unparseable) and `MAX_TTL` (if too large)
 6. **Calculate expiry**: `expiresAt = time.Now() + ttl`
-7. **Track image**: Store in Redis with expiry timestamp
-8. **Update metrics**: Increment `ephemeron_hooks_images_tracked_total`
+7. **Fetch image size**: GET manifest from registry to calculate total size (best effort)
+8. **Track image**: Store in Redis with expiry timestamp and size
+9. **Update metrics**: Increment tracked counters, observe size distribution
 
 #### TTL Parsing (`internal/hooks/ttl.go`)
 
@@ -149,8 +150,10 @@ Periodically scans tracked images and deletes expired ones from the registry.
 │ For each image:                  │
 │   1. Get expiry timestamp        │
 │   2. Compare with current time   │
-│   3. If expired → deleteImage()  │
-│   4. Update metrics              │
+│   3. If expired:                 │
+│      - Get image size from Redis │
+│      - deleteImage()             │
+│      - Update storage metrics    │
 └─────────────┬────────────────────┘
               │
               ▼
@@ -206,7 +209,8 @@ Rebuilds Redis state by scanning the registry catalog.
 │   1. ParseTTL(tag)               │
 │   2. ClampTTL()                  │
 │   3. expiresAt = now + ttl       │
-│   4. TrackImage() in Redis       │
+│   4. Fetch image size (manifest) │
+│   5. TrackImage() in Redis       │
 └─────────────┬────────────────────┘
               │
               ▼
@@ -232,9 +236,10 @@ type Store interface {
     Close() error
 
     // Image tracking
-    TrackImage(ctx, imageWithTag, expiresAt) error
+    TrackImage(ctx, imageWithTag, expiresAt, sizeBytes) error
     ListImages(ctx) ([]string, error)
     GetExpiry(ctx, imageWithTag) (int64, error)
+    GetImageSize(ctx, imageWithTag) (int64, error)
     RemoveImage(ctx, imageWithTag) error
     ImageCount(ctx) (int64, error)
 
@@ -265,9 +270,12 @@ Metadata for each tracked image.
 HGETALL myapp:1h
 → {
     "created": "1707831234567",   // Unix milliseconds
-    "expires": "1707834834567"    // Unix milliseconds
+    "expires": "1707834834567",   // Unix milliseconds
+    "size_bytes": "12345678"      // Total image size in bytes
   }
 ```
+
+Note: `size_bytes` may be "0" if size fetch failed or for old records (backward compatible).
 
 ##### Key: `reaper.lock` (String with TTL)
 Distributed lock to ensure only one reaper instance runs at a time.
@@ -303,6 +311,14 @@ GET /v2/_catalog?n=1000
 ```
 GET /v2/{repo}/tags/list?n=1000
 → {"name": "repo", "tags": ["tag1", "tag2", ...]}
+```
+
+**Get Image Size**
+```
+GET /v2/{repo}/manifests/{tag}
+Accept: application/vnd.oci.image.manifest.v1+json,
+        application/vnd.docker.distribution.manifest.v2+json
+→ Parses manifest JSON and sums config.size + all layers[].size
 ```
 
 **Pagination**: Follows `Link: </v2/_catalog?n=1000&last=repo>; rel="next"` headers.
@@ -346,14 +362,18 @@ Prometheus metrics exposed at `GET /metrics` (internal port):
 #### Counters
 - `ephemeron_hooks_webhook_events_total{action}` - Total webhook events received
 - `ephemeron_hooks_images_tracked_total` - Total images added to tracking
+- `ephemeron_hooks_image_size_fetch_errors_total` - Total size fetch failures
 - `ephemeron_reaper_images_reaped_total` - Total images deleted
 - `ephemeron_reaper_cycle_errors_total` - Total failed reaper cycles
+- `ephemeron_storage_bytes_reclaimed_total` - Total storage reclaimed by deletion
 
 #### Gauges
 - `ephemeron_reaper_tracked_images` - Current number of tracked images
+- `ephemeron_storage_tracked_bytes_total` - Current total storage tracked
 
 #### Histograms
 - `ephemeron_reaper_cycle_duration_seconds` - Reaper cycle duration
+- `ephemeron_storage_image_size_bytes` - Image size distribution (1MB-10GB buckets)
 
 ## HTTP API
 
@@ -418,9 +438,10 @@ Prometheus metrics in text exposition format.
    - Authenticates request
    - Parses tag "1h" → 1 hour
    - Calculates expiry: now + 1h
+   - Fetches manifest to calculate image size
    - Stores in Redis:
      * SADD current.images "myapp:1h"
-     * HSET myapp:1h created <now> expires <now+1h>
+     * HSET myapp:1h created <now> expires <now+1h> size_bytes <size>
 
 4. User pulls and uses image
    $ docker pull reg.example.com/myapp:1h
@@ -444,10 +465,12 @@ Prometheus metrics in text exposition format.
    - HGET myapp:1h expires → 1707834834567
    - Compare with current time
    - If expired:
+     * HGET myapp:1h size_bytes → get size for metrics
      * HEAD /v2/myapp/manifests/1h → get digest
      * DELETE /v2/myapp/manifests/<digest>
      * SREM current.images "myapp:1h"
      * DEL myapp:1h
+     * Update storage metrics (bytes reclaimed, tracked bytes)
 
 5. Release lock
    DEL reaper.lock
@@ -706,9 +729,9 @@ readinessProbe:
 
 ### Potential Improvements
 
-1. **Image Size Tracking**: Store blob sizes, add metrics for disk space reclaimed
-2. **Granular Locking**: Per-image locks to allow parallel deletion
-3. **Tag Immutability**: Detect and warn about tag overwrites
+1. **Granular Locking**: Per-image locks to allow parallel deletion
+2. **Tag Immutability**: Detect and warn about tag overwrites
+3. **Shared Layer Deduplication**: Account for shared base layers in size metrics
 
 ### Architectural Constraints
 
