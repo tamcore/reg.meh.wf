@@ -195,3 +195,123 @@ func TestReapOnce_NotExpired(t *testing.T) {
 		t.Error("non-expired image should not be removed")
 	}
 }
+
+// mockHealthReporter records ReportSuccess/ReportFailure calls.
+type mockHealthReporter struct {
+	successes int
+	failures  int
+}
+
+func (m *mockHealthReporter) ReportSuccess() { m.successes++ }
+func (m *mockHealthReporter) ReportFailure() { m.failures++ }
+
+func TestReapOnce_AllDeletesFail_ReportsFailure(t *testing.T) {
+	reg := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer reg.Close()
+
+	store := newMockStore()
+	store.images["img1:1h"] = time.Now().Add(-time.Minute).UnixMilli()
+	store.images["img2:1h"] = time.Now().Add(-time.Minute).UnixMilli()
+
+	hr := &mockHealthReporter{}
+	r := New(store, reg.URL, slog.Default(), WithHealthReporter(hr))
+
+	if err := r.ReapOnce(t.Context()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.failures != 1 {
+		t.Errorf("expected 1 failure report, got %d", hr.failures)
+	}
+	if hr.successes != 0 {
+		t.Errorf("expected 0 success reports, got %d", hr.successes)
+	}
+}
+
+func TestReapOnce_AllDeletesSucceed_ReportsSuccess(t *testing.T) {
+	reg := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodHead:
+			w.Header().Set("Docker-Content-Digest", "sha256:abc123")
+			w.WriteHeader(http.StatusOK)
+		case http.MethodDelete:
+			w.WriteHeader(http.StatusAccepted)
+		}
+	}))
+	defer reg.Close()
+
+	store := newMockStore()
+	store.images["img1:1h"] = time.Now().Add(-time.Minute).UnixMilli()
+
+	hr := &mockHealthReporter{}
+	r := New(store, reg.URL, slog.Default(), WithHealthReporter(hr))
+
+	if err := r.ReapOnce(t.Context()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.successes != 1 {
+		t.Errorf("expected 1 success report, got %d", hr.successes)
+	}
+	if hr.failures != 0 {
+		t.Errorf("expected 0 failure reports, got %d", hr.failures)
+	}
+}
+
+func TestReapOnce_NoExpiredImages_NoHealthReport(t *testing.T) {
+	reg := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("registry should not be called")
+	}))
+	defer reg.Close()
+
+	store := newMockStore()
+	store.images["img1:1h"] = time.Now().Add(time.Hour).UnixMilli()
+
+	hr := &mockHealthReporter{}
+	r := New(store, reg.URL, slog.Default(), WithHealthReporter(hr))
+
+	if err := r.ReapOnce(t.Context()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.successes != 0 || hr.failures != 0 {
+		t.Errorf("expected no health reports when no deletions attempted, got %d successes, %d failures",
+			hr.successes, hr.failures)
+	}
+}
+
+func TestReapOnce_PartialFailure_ReportsSuccess(t *testing.T) {
+	var callCount int
+	reg := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			callCount++
+			if callCount == 1 {
+				// First image: fail
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			// Second image: succeed
+			w.Header().Set("Docker-Content-Digest", "sha256:abc123")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer reg.Close()
+
+	store := newMockStore()
+	store.images["aaa:1h"] = time.Now().Add(-time.Minute).UnixMilli()
+	store.images["zzz:1h"] = time.Now().Add(-time.Minute).UnixMilli()
+
+	hr := &mockHealthReporter{}
+	r := New(store, reg.URL, slog.Default(), WithHealthReporter(hr))
+
+	if err := r.ReapOnce(t.Context()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hr.successes != 1 {
+		t.Errorf("expected 1 success report for partial failure, got %d", hr.successes)
+	}
+	if hr.failures != 0 {
+		t.Errorf("expected 0 failure reports for partial failure, got %d", hr.failures)
+	}
+}

@@ -8,15 +8,16 @@ import (
 func TestValidate(t *testing.T) {
 	base := func() Config {
 		return Config{
-			Port:         8000,
-			RedisURL:     "redis://localhost:6379",
-			HookToken:    "secret",
-			RegistryURL:  "http://localhost:5000",
-			Hostname:     "localhost",
-			DefaultTTL:   time.Hour,
-			MaxTTL:       24 * time.Hour,
-			ReapInterval: time.Minute,
-			LogFormat:    "text",
+			Port:                   8000,
+			RedisURL:               "redis://localhost:6379",
+			HookToken:              "secret",
+			RegistryURL:            "http://localhost:5000",
+			Hostname:               "localhost",
+			DefaultTTL:             time.Hour,
+			MaxTTL:                 24 * time.Hour,
+			ReapInterval:           time.Minute,
+			LogFormat:              "text",
+			HealthFailureThreshold: 3,
 		}
 	}
 
@@ -64,6 +65,14 @@ func TestValidate(t *testing.T) {
 		c.DefaultTTL = 0
 		if err := c.Validate(); err == nil {
 			t.Fatal("expected error for zero DefaultTTL")
+		}
+	})
+
+	t.Run("zero health threshold", func(t *testing.T) {
+		c := base()
+		c.HealthFailureThreshold = 0
+		if err := c.Validate(); err == nil {
+			t.Fatal("expected error for zero HealthFailureThreshold")
 		}
 	})
 }

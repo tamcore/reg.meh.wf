@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tamcore/ephemeron/internal/config"
+	"github.com/tamcore/ephemeron/internal/health"
 	"github.com/tamcore/ephemeron/internal/hooks"
 	"github.com/tamcore/ephemeron/internal/reaper"
 	recoverlib "github.com/tamcore/ephemeron/internal/recover"
@@ -46,17 +47,18 @@ func main() {
 
 func newConfig() *config.Config {
 	return &config.Config{
-		Port:                 envInt("PORT", 8000),
-		InternalPort:         envInt("INTERNAL_PORT", 9090),
-		RedisURL:             envStr("REDIS_URL", envStr("REDISCLOUD_URL", "redis://localhost:6379")),
-		HookToken:            envStr("HOOK_TOKEN", ""),
-		RegistryURL:          envStr("REGISTRY_URL", "http://localhost:5000"),
-		Hostname:             envStr("HOSTNAME_OVERRIDE", "localhost"),
-		DefaultTTL:           envDuration("DEFAULT_TTL", time.Hour),
-		MaxTTL:               envDuration("MAX_TTL", 24*time.Hour),
-		ReapInterval:         envDuration("REAP_INTERVAL", time.Minute),
-		LogFormat:            envStr("LOG_FORMAT", "json"),
-		ImmutableTagPatterns: envStrSlice("IMMUTABLE_TAG_PATTERNS", nil),
+		Port:                   envInt("PORT", 8000),
+		InternalPort:           envInt("INTERNAL_PORT", 9090),
+		RedisURL:               envStr("REDIS_URL", envStr("REDISCLOUD_URL", "redis://localhost:6379")),
+		HookToken:              envStr("HOOK_TOKEN", ""),
+		RegistryURL:            envStr("REGISTRY_URL", "http://localhost:5000"),
+		Hostname:               envStr("HOSTNAME_OVERRIDE", "localhost"),
+		DefaultTTL:             envDuration("DEFAULT_TTL", time.Hour),
+		MaxTTL:                 envDuration("MAX_TTL", 24*time.Hour),
+		ReapInterval:           envDuration("REAP_INTERVAL", time.Minute),
+		LogFormat:              envStr("LOG_FORMAT", "json"),
+		ImmutableTagPatterns:   envStrSlice("IMMUTABLE_TAG_PATTERNS", nil),
+		HealthFailureThreshold: envInt("HEALTH_FAILURE_THRESHOLD", 3),
 	}
 }
 
@@ -104,7 +106,8 @@ func serveCmd() *cobra.Command {
 			}
 
 			// Start reaper in background.
-			r := reaper.New(rdb, cfg.RegistryURL, logger.With("component", "reaper"))
+			healthChecker := health.New(cfg.HealthFailureThreshold, logger.With("component", "health"))
+			r := reaper.New(rdb, cfg.RegistryURL, logger.With("component", "reaper"), reaper.WithHealthReporter(healthChecker))
 			go r.RunLoop(ctx, cfg.ReapInterval)
 
 			// Set up public HTTP routes (webhook + landing page).
@@ -126,6 +129,11 @@ func serveCmd() *cobra.Command {
 			// Set up internal HTTP routes (probes + metrics).
 			internalMux := http.NewServeMux()
 			internalMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+				if !healthChecker.IsHealthy() {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`{"status":"unhealthy","reason":"registry unreachable"}`))
+					return
+				}
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte(`{"status":"ok"}`))
 			})

@@ -12,22 +12,43 @@ import (
 	redisclient "github.com/tamcore/ephemeron/internal/redis"
 )
 
+// HealthReporter is called by the reaper to report registry interaction outcomes.
+type HealthReporter interface {
+	ReportSuccess()
+	ReportFailure()
+}
+
 // Reaper periodically checks for and deletes expired images.
 type Reaper struct {
 	redis       redisclient.Store
 	registryURL string
 	logger      *slog.Logger
 	httpClient  *http.Client
+	health      HealthReporter
+}
+
+// Option configures a Reaper.
+type Option func(*Reaper)
+
+// WithHealthReporter sets a HealthReporter that is notified after each reap cycle.
+func WithHealthReporter(h HealthReporter) Option {
+	return func(r *Reaper) {
+		r.health = h
+	}
 }
 
 // New creates a new Reaper.
-func New(redis redisclient.Store, registryURL string, logger *slog.Logger) *Reaper {
-	return &Reaper{
+func New(redis redisclient.Store, registryURL string, logger *slog.Logger, opts ...Option) *Reaper {
+	r := &Reaper{
 		redis:       redis,
 		registryURL: strings.TrimRight(registryURL, "/"),
 		logger:      logger,
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 // RunLoop starts the reaper loop, ticking at the given interval.
@@ -81,6 +102,8 @@ func (r *Reaper) ReapOnce(ctx context.Context) error {
 
 	now := time.Now().UnixMilli()
 
+	var attempted, failed int
+
 	for _, image := range images {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -109,8 +132,10 @@ func (r *Reaper) ReapOnce(ctx context.Context) error {
 			sizeBytes = 0
 		}
 
+		attempted++
 		if err := r.deleteImage(ctx, image); err != nil {
 			r.logger.Error("failed to delete image", "image", image, "error", err)
+			failed++
 			continue
 		}
 
@@ -125,6 +150,17 @@ func (r *Reaper) ReapOnce(ctx context.Context) error {
 			"size_bytes", sizeBytes,
 			"size_mb", fmt.Sprintf("%.2f", sizeMB),
 		)
+	}
+
+	// Report registry health based on deletion outcomes.
+	// Only report when we actually attempted deletions — cycles with
+	// no expired images are neutral and should not affect health state.
+	if r.health != nil && attempted > 0 {
+		if failed == attempted {
+			r.health.ReportFailure()
+		} else {
+			r.health.ReportSuccess()
+		}
 	}
 
 	return nil
